@@ -93,7 +93,36 @@
     box-shadow: 0 2px 16px var(--shadow);
     max-width: 100%;
   }
+  #pageFrame.text-mode {
+    background: var(--page);
+    padding: 0;
+    max-width: 640px; width: 100%;
+  }
   #pageFrame canvas { display: block; max-width: 100%; height: auto; mix-blend-mode: multiply; }
+
+  /* Modo texto (estilo Kindle) */
+  #textView { display: none; }
+  #pageFrame.text-mode #canvas { display: none; }
+  #pageFrame.text-mode #textView { display: block; }
+  .kindle-text {
+    font-family: Georgia, "Times New Roman", serif;
+    color: var(--ink);
+    line-height: 1.55;
+    text-align: justify;
+    -webkit-hyphens: auto; hyphens: auto;
+    word-break: normal; overflow-wrap: break-word;
+    padding: 30px 22px;
+  }
+  .kindle-text p { margin: 0 0 0.35em; text-indent: 1.3em; }
+  .kindle-text p.first { text-indent: 0; }
+  .kindle-text p.head {
+    text-indent: 0; text-align: center; font-weight: bold;
+    margin: 0.4em 0 0.8em; letter-spacing: 0.5px;
+  }
+  .reflow-note {
+    font-size: 12px; color: var(--ink-soft); text-align: center;
+    padding: 4px 22px 18px; font-style: italic;
+  }
 
   .tapzone { position: fixed; top: 0; bottom: 64px; width: 28%; z-index: 5; }
   .tapzone.left { left: 0; }
@@ -101,14 +130,20 @@
 
   #topbar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 12;
-    padding: calc(env(safe-area-inset-top) + 8px) 16px 10px;
+    padding: calc(env(safe-area-inset-top) + 8px) 14px 10px;
     background: linear-gradient(var(--paper), rgba(232,220,192,0));
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; gap: 10px;
     transition: transform 0.25s ease, opacity 0.25s ease;
   }
   #topbar.hidden { transform: translateY(-100%); opacity: 0; }
   #backBtn { border: none; background: transparent; color: var(--ink); font-size: 16px; font-family: inherit; cursor: pointer; padding: 6px 0; }
   #bookName { font-size: 14px; color: var(--ink-soft); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #modeBtn {
+    border: 1px solid var(--ink-soft); background: transparent; color: var(--ink);
+    font-family: inherit; font-size: 13px; padding: 6px 12px; border-radius: 14px;
+    cursor: pointer; flex-shrink: 0;
+  }
+  #modeBtn:active { background: var(--edge); }
 
   #bar {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 12;
@@ -126,7 +161,7 @@
   .ctrl { display: flex; align-items: center; gap: 6px; }
   .ctrl button { font-size: 19px; width: 38px; height: 38px; border-radius: 50%; }
   .ctrl button:active { background: var(--edge); }
-  .ctrl span { font-size: 12px; color: var(--ink-soft); min-width: 38px; text-align: center; }
+  .ctrl span { font-size: 12px; color: var(--ink-soft); min-width: 40px; text-align: center; }
 
   #loading {
     position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
@@ -152,8 +187,14 @@
   <div id="topbar">
     <button id="backBtn">‹ Biblioteca</button>
     <span id="bookName"></span>
+    <button id="modeBtn">Texto</button>
   </div>
-  <div id="canvasWrap"><div id="pageFrame"><canvas id="canvas"></canvas></div></div>
+  <div id="canvasWrap">
+    <div id="pageFrame">
+      <canvas id="canvas"></canvas>
+      <div id="textView"></div>
+    </div>
+  </div>
   <div class="tapzone left" id="tapLeft"></div>
   <div class="tapzone right" id="tapRight"></div>
   <div id="bar">
@@ -201,9 +242,10 @@ function dbDel(id) { return new Promise((res, rej) => { const r = tx("readwrite"
 const $ = id => document.getElementById(id);
 const canvas = $("canvas"), ctx = canvas.getContext("2d");
 let pdfDoc = null, current = null;
-let pageNum = 1, zoom = 1.0, rendering = false, pendingPage = null;
+let pageNum = 1, zoom = 1.0, fontPx = 20, mode = "page", rendering = false, pendingPage = null;
 const BASE = 1.7;
 
+/* ---------- Biblioteca ---------- */
 async function renderShelf() {
   const books = await dbGetAll();
   books.sort((a, b) => (b.lastRead || 0) - (a.lastRead || 0));
@@ -237,6 +279,7 @@ async function renderShelf() {
 }
 function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
+/* ---------- Adicionar ---------- */
 $("addBtn").onclick = () => $("file").click();
 $("file").onchange = e => {
   const f = e.target.files[0];
@@ -250,7 +293,7 @@ $("file").onchange = e => {
     const rec = {
       id: "b_" + Date.now(),
       title: f.name.replace(/\.pdf$/i, ""),
-      data: buf, page: 1, pages, zoom: 1.0, lastRead: Date.now()
+      data: buf, page: 1, pages, zoom: 1.0, fontPx: 20, mode: "page", lastRead: Date.now()
     };
     await dbPut(rec);
     $("file").value = "";
@@ -260,6 +303,7 @@ $("file").onchange = e => {
   fr.readAsArrayBuffer(f);
 };
 
+/* ---------- Abrir ---------- */
 async function openBook(id) {
   const rec = await dbGet(id);
   if (!rec) return;
@@ -267,16 +311,31 @@ async function openBook(id) {
   current = rec;
   pageNum = rec.page || 1;
   zoom = rec.zoom || 1.0;
-  $("zoomLevel").textContent = Math.round(zoom * 100) + "%";
+  fontPx = rec.fontPx || 20;
+  mode = rec.mode || "page";
   $("bookName").textContent = rec.title;
+  applyModeUI();
   pdfDoc = await pdfjsLib.getDocument({ data: rec.data.slice(0) }).promise;
   if (!rec.pages) rec.pages = pdfDoc.numPages;
   $("loading").style.display = "none";
   $("library").style.display = "none";
   $("reader").style.display = "flex";
-  renderPage(pageNum);
+  renderCurrent();
 }
 
+function applyModeUI() {
+  $("pageFrame").classList.toggle("text-mode", mode === "text");
+  $("modeBtn").textContent = (mode === "text") ? "Página" : "Texto";
+  $("zoomLevel").textContent = (mode === "text") ? (fontPx + "px") : (Math.round(zoom * 100) + "%");
+}
+
+/* ---------- Render geral ---------- */
+function renderCurrent() {
+  if (mode === "text") renderText(pageNum);
+  else renderPage(pageNum);
+}
+
+/* ---------- Render imagem (Modo Página) ---------- */
 function renderPage(num) {
   if (!pdfDoc) return;
   rendering = true;
@@ -293,21 +352,127 @@ function renderPage(num) {
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     page.render({ canvasContext: ctx, viewport }).promise.then(() => {
       rendering = false;
-      if (pendingPage !== null) { const p = pendingPage; pendingPage = null; renderPage(p); }
+      if (pendingPage !== null) { const p = pendingPage; pendingPage = null; renderCurrent(); }
     });
     $("pageInfo").textContent = num + " / " + pdfDoc.numPages;
     $("canvasWrap").scrollTop = 0;
     saveProgress();
   });
 }
-function queueRender(num) { if (rendering) pendingPage = num; else renderPage(num); }
+
+/* ---------- Render texto (Modo Kindle / reflow) ---------- */
+async function renderText(num) {
+  if (!pdfDoc) return;
+  const view = $("textView");
+  view.innerHTML = '<div class="kindle-text" style="font-size:' + fontPx + 'px" lang="pt-BR"></div>';
+  const box = view.firstChild;
+  $("pageInfo").textContent = num + " / " + pdfDoc.numPages;
+  $("canvasWrap").scrollTop = 0;
+  saveProgress();
+  try {
+    const page = await pdfDoc.getPage(num);
+    const blocks = await extractReflow(page);
+    if (!blocks || !blocks.length) {
+      // sem texto extraível (página escaneada / só imagem) -> cai pro modo página
+      box.innerHTML = '<p class="first">Esta página não tem texto selecionável (provavelmente é imagem/escaneada). Mostrando no Modo Página.</p>';
+      setTimeout(() => { mode = "page"; applyModeUI(); renderPage(num); }, 50);
+      return;
+    }
+    let html = "";
+    blocks.forEach((b, i) => {
+      const cls = b.head ? "head" : (i === 0 ? "first" : "");
+      html += '<p' + (cls ? ' class="' + cls + '"' : '') + '>' + escapeHtml(b.text) + '</p>';
+    });
+    box.innerHTML = html;
+  } catch (err) {
+    box.innerHTML = '<p class="first">Não consegui extrair o texto desta página.</p>';
+  }
+}
+
+/* Extrai linhas do PDF e remonta em parágrafos */
+async function extractReflow(page) {
+  const tc = await page.getTextContent();
+  const raw = tc.items.filter(it => typeof it.str === "string" && it.str.length);
+  if (!raw.length) return [];
+
+  // agrupa em linhas pela posição vertical (y)
+  const lines = [];
+  for (const it of raw) {
+    const x = it.transform[4];
+    const y = it.transform[5];
+    const fs = Math.hypot(it.transform[0], it.transform[1]) || it.height || 12;
+    let line = null;
+    for (const l of lines) { if (Math.abs(l.y - y) <= Math.max(3, fs * 0.4)) { line = l; break; } }
+    if (!line) { line = { y: y, items: [] }; lines.push(line); }
+    line.items.push({ x: x, str: it.str, w: it.width || 0, fs: fs });
+  }
+  lines.sort((a, b) => b.y - a.y); // topo -> base
+
+  // monta texto de cada linha (com detecção de espaço por lacuna)
+  const L = [];
+  for (const l of lines) {
+    l.items.sort((a, b) => a.x - b.x);
+    let text = "", prevEnd = null, minX = Infinity, maxFs = 0;
+    for (const it of l.items) {
+      if (prevEnd !== null) {
+        const gap = it.x - prevEnd;
+        if (gap > it.fs * 0.25 && !/\s$/.test(text) && !/^\s/.test(it.str)) text += " ";
+      }
+      text += it.str;
+      prevEnd = it.x + it.w;
+      if (it.x < minX) minX = it.x;
+      if (it.fs > maxFs) maxFs = it.fs;
+    }
+    text = text.replace(/\s+/g, " ").trim();
+    if (text) L.push({ y: l.y, x0: minX, fs: maxFs, text: text });
+  }
+  if (!L.length) return [];
+
+  // mediana das lacunas verticais entre linhas
+  const gaps = [];
+  for (let i = 1; i < L.length; i++) gaps.push(Math.abs(L[i - 1].y - L[i].y));
+  gaps.sort((a, b) => a - b);
+  const medGap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
+  const leftMin = Math.min.apply(null, L.map(l => l.x0));
+  const bodyFs = medianFs(L);
+
+  // remonta parágrafos
+  const blocks = [];
+  let buf = "", bufHead = false;
+  for (let i = 0; i < L.length; i++) {
+    const l = L[i], prev = L[i - 1];
+    let brk = false;
+    if (i > 0) {
+      const g = Math.abs(prev.y - l.y);
+      if (medGap && g > medGap * 1.6) brk = true;
+      if (l.x0 > leftMin + l.fs * 0.8) brk = true;
+      if (Math.abs(l.fs - prev.fs) > 1.5) brk = true;
+    }
+    if (brk && buf) { blocks.push({ text: buf, head: bufHead }); buf = ""; bufHead = false; }
+    if (!buf) bufHead = (l.fs > bodyFs * 1.18); // linha bem maior = título
+    if (buf) {
+      if (/[\-\u00AD]$/.test(buf)) buf = buf.replace(/[\-\u00AD]$/, "") + l.text; // de-hifeniza
+      else buf += " " + l.text;
+    } else {
+      buf = l.text;
+    }
+  }
+  if (buf) blocks.push({ text: buf, head: bufHead });
+  return blocks;
+}
+
+function medianFs(L) {
+  const a = L.map(l => l.fs).sort((x, y) => x - y);
+  return a.length ? a[Math.floor(a.length / 2)] : 12;
+}
 
 let saveTimer;
 function saveProgress() {
   if (!current) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    current.page = pageNum; current.zoom = zoom; current.lastRead = Date.now();
+    current.page = pageNum; current.zoom = zoom; current.fontPx = fontPx;
+    current.mode = mode; current.lastRead = Date.now();
     await dbPut(current);
   }, 400);
 }
@@ -315,18 +480,42 @@ function saveProgress() {
 function go(d) {
   const t = pageNum + d;
   if (t < 1 || t > pdfDoc.numPages) return;
-  pageNum = t; queueRender(pageNum);
+  pageNum = t;
+  if (mode === "text") renderText(pageNum);
+  else queuePage(pageNum);
 }
+function queuePage(num) { if (rendering) pendingPage = num; else renderPage(num); }
 
+/* ---------- Controles ---------- */
 $("prev").onclick = () => go(-1);
 $("next").onclick = () => go(1);
 $("tapLeft").onclick = () => go(-1);
 $("tapRight").onclick = () => go(1);
-$("zoomIn").onclick = () => { zoom = Math.min(zoom + 0.15, 3); $("zoomLevel").textContent = Math.round(zoom*100)+"%"; queueRender(pageNum); saveProgress(); };
-$("zoomOut").onclick = () => { zoom = Math.max(zoom - 0.15, 0.5); $("zoomLevel").textContent = Math.round(zoom*100)+"%"; queueRender(pageNum); saveProgress(); };
+
+$("zoomIn").onclick = () => {
+  if (mode === "text") { fontPx = Math.min(fontPx + 1, 34); $("zoomLevel").textContent = fontPx + "px"; renderText(pageNum); }
+  else { zoom = Math.min(zoom + 0.15, 3); $("zoomLevel").textContent = Math.round(zoom*100)+"%"; queuePage(pageNum); }
+  saveProgress();
+};
+$("zoomOut").onclick = () => {
+  if (mode === "text") { fontPx = Math.max(fontPx - 1, 13); $("zoomLevel").textContent = fontPx + "px"; renderText(pageNum); }
+  else { zoom = Math.max(zoom - 0.15, 0.5); $("zoomLevel").textContent = Math.round(zoom*100)+"%"; queuePage(pageNum); }
+  saveProgress();
+};
+
+$("modeBtn").onclick = () => {
+  mode = (mode === "text") ? "page" : "text";
+  applyModeUI();
+  renderCurrent();
+  saveProgress();
+};
 
 $("backBtn").onclick = async () => {
-  if (current) { current.page = pageNum; current.zoom = zoom; current.lastRead = Date.now(); await dbPut(current); }
+  if (current) {
+    current.page = pageNum; current.zoom = zoom; current.fontPx = fontPx;
+    current.mode = mode; current.lastRead = Date.now();
+    await dbPut(current);
+  }
   $("reader").style.display = "none";
   $("library").style.display = "flex";
   pdfDoc = null; current = null;
@@ -341,7 +530,7 @@ $("canvasWrap").addEventListener("click", () => {
 });
 
 document.addEventListener("keydown", e => { if (e.key==="ArrowLeft") go(-1); if (e.key==="ArrowRight") go(1); });
-let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (pdfDoc) queueRender(pageNum); }, 200); });
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (pdfDoc) renderCurrent(); }, 200); });
 
 (async () => { await openDB(); renderShelf(); })();
 </script>
