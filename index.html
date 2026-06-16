@@ -58,13 +58,15 @@
   #nameCancel { background: transparent; color: var(--ink); } #nameSave { background: var(--ink); color: var(--paper); }
 
   /* LEITOR comum */
-  #reader { display: none; position: fixed; inset: 0; background: var(--paper); z-index: 10; }
+  #reader { display: none; position: fixed; inset: 0; background: var(--page); z-index: 10; }
 
   /* Engine TEXTO (a tela inteira é o "papel") */
   #textReader { position: absolute; inset: 0; background: var(--page); display: none; }
   #textReader.on { display: block; }
-  #kindlePad { position: absolute; inset: 0; padding: calc(env(safe-area-inset-top) + 18px) 24px calc(48px + env(safe-area-inset-bottom)); }
-  #kindlePage { width: 100%; height: 100%; overflow: hidden; }
+  #kindlePad { position: absolute; inset: 0; padding: calc(env(safe-area-inset-top) + 22px) 26px calc(40px + env(safe-area-inset-bottom)); }
+  #kindlePage { width: 100%; height: 100%; overflow: hidden; -webkit-user-select: text; user-select: text; }
+  #kindlePage mark.hl { background: rgba(255,214,71,0.5); color: inherit; border-radius: 2px; }
+  .theme-dark #kindlePage mark.hl { background: rgba(255,214,71,0.28); }
   .kindle-text { font-family: Georgia, "Times New Roman", serif; color: var(--ink); line-height: 1.55; text-align: justify; -webkit-hyphens: auto; hyphens: auto; overflow-wrap: break-word; }
   .kindle-text p { margin: 0 0 0.32em; text-indent: 1.35em; }
   .kindle-text p.cont { text-indent: 0; }
@@ -82,18 +84,22 @@
   .theme-sepia #pageCanvas { mix-blend-mode: multiply; }
   .theme-dark  #pageCanvas { filter: invert(1) hue-rotate(180deg); }
 
-  #topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 14; padding: calc(env(safe-area-inset-top) + 8px) 14px 12px; background: linear-gradient(var(--paper), rgba(0,0,0,0) 100%); display: flex; align-items: center; gap: 10px; transition: transform 0.25s ease, opacity 0.25s ease; }
+  #topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 14; padding: calc(env(safe-area-inset-top) + 8px) 14px 12px; background: linear-gradient(var(--page), rgba(0,0,0,0) 100%); display: flex; align-items: center; gap: 10px; transition: transform 0.25s ease, opacity 0.25s ease; }
   #topbar.hidden { transform: translateY(-110%); opacity: 0; pointer-events: none; }
-  #backBtn { border: none; background: transparent; color: var(--ink); font-size: 16px; font-family: inherit; cursor: pointer; padding: 6px 0; }
-  #bookName { font-size: 14px; color: var(--ink-soft); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #backBtn { border: none; background: transparent; color: var(--ink); font-size: 24px; font-family: Georgia, serif; cursor: pointer; padding: 4px 8px; line-height: 1; }
+  #topbar .spacer { flex: 1; }
   #aaBtn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); font-family: Georgia, serif; font-size: 16px; padding: 4px 14px; border-radius: 16px; cursor: pointer; flex-shrink: 0; }
 
-  #bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 14; height: calc(58px + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom); display: flex; align-items: center; justify-content: space-between; background: linear-gradient(rgba(0,0,0,0) 0%, var(--paper) 55%); transition: transform 0.25s ease, opacity 0.25s ease; }
+  #bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 14; height: calc(58px + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom); display: flex; align-items: center; justify-content: space-between; background: linear-gradient(rgba(0,0,0,0) 0%, var(--page) 55%); transition: transform 0.25s ease, opacity 0.25s ease; }
   #bar.hidden { transform: translateY(110%); opacity: 0; pointer-events: none; }
   #bar button { border: none; background: transparent; color: var(--ink); font-family: Georgia, serif; cursor: pointer; font-size: 28px; width: 56px; height: 46px; }
-  #pageInfo { font-size: 13px; color: var(--ink-soft); flex: 1; text-align: center; }
+  /* número da página, discreto no canto inferior direito (estilo livro de papel) */
+  #pageNum { position: fixed; right: 18px; bottom: calc(env(safe-area-inset-bottom) + 8px); z-index: 13; font-size: 12px; color: var(--ink-soft); font-family: Georgia, serif; }
   #progressLine { position: fixed; left: 0; right: 0; bottom: 0; height: 3px; z-index: 13; }
-  #progressFill { height: 100%; width: 0%; background: var(--ink-soft); opacity: 0.5; transition: width 0.2s ease; }
+  #progressFill { height: 100%; width: 0%; background: var(--ink-soft); opacity: 0.4; transition: width 0.2s ease; }
+  /* botão flutuante de grifar */
+  #grifar { position: fixed; z-index: 22; display: none; transform: translate(-50%, 0); background: var(--ink); color: var(--page); border: none; font-family: inherit; font-size: 14px; padding: 9px 16px; border-radius: 20px; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,0.35); white-space: nowrap; }
+  #grifar.on { display: block; }
 
   #settings { position: fixed; inset: 0; z-index: 16; display: none; background: rgba(10,8,4,0.35); }
   #settings.on { display: block; }
@@ -135,10 +141,13 @@
 <div id="reader">
   <div id="textReader"><div id="kindlePad"><div id="kindlePage" class="kindle-text" lang="pt-BR"></div></div></div>
   <div id="imgReader"><div id="scroll"><div id="pageSheet"><canvas id="pageCanvas"></canvas></div></div></div>
-  <div id="topbar"><button id="backBtn">‹ Biblioteca</button><span id="bookName"></span><button id="aaBtn">Aa</button></div>
-  <div id="bar"><button id="prev">‹</button><span id="pageInfo">—</span><button id="next">›</button></div>
+  <div id="topbar"><button id="backBtn">‹</button><span class="spacer"></span><button id="aaBtn">Aa</button></div>
+  <div id="bar"><button id="prev">‹</button><span class="spacer" style="flex:1"></span><button id="next">›</button></div>
+  <div id="pageNum"></div>
   <div id="progressLine"><div id="progressFill"></div></div>
 </div>
+
+<button id="grifar">Grifar</button>
 
 <div id="settings">
   <div id="settingsCard">
@@ -176,7 +185,7 @@ let mode = "text", fillMode = "crop", theme = "sepia";
 let zoom = 1.0;            // engine imagem
 let fontPx = 20;          // engine texto
 let imgPage = 1;          // engine imagem (página atual)
-let screens = [""], screenIdx = 0, pageSig = "";
+let screens = [{ h: "", pg: 1 }], screenIdx = 0, pageSig = "";
 let rendering = false, pendingRender = false;
 
 /* ===== Tema / modo / ajuste ===== */
@@ -250,7 +259,6 @@ async function openBook(id) {
   showLoading("Abrindo…", false);
   current = rec;
   mode = rec.mode || "text"; zoom = rec.zoom || 1.0; fontPx = rec.fontPx || 20; imgPage = rec.page || 1;
-  $("bookName").textContent = rec.title;
   pdfDoc = await pdfjsLib.getDocument({ data: rec.data.slice(0) }).promise;
   if (!rec.pages) rec.pages = pdfDoc.numPages;
   $("library").style.display = "none"; $("reader").style.display = "block";
@@ -302,9 +310,11 @@ async function paginateAndShow(restore) {
 }
 
 function showScreen() {
-  $("kindlePage").innerHTML = screens[screenIdx] || "";
+  const sc = screens[screenIdx] || { h: "", pg: 1 };
+  $("kindlePage").innerHTML = sc.h || "";
+  applyHighlights($("kindlePage"));
   const total = screens.length;
-  $("pageInfo").textContent = (screenIdx + 1) + " / " + total;
+  $("pageNum").textContent = sc.pg || "";
   $("progressFill").style.width = (total > 1 ? (screenIdx / (total - 1) * 100) : 0) + "%";
   saveText();
 }
@@ -345,8 +355,8 @@ async function extractBook() {
       } catch (e) {}
       if (textLen < 120 || hasImg) asImage = true;
     }
-    if (asImage) { const d = await renderPageImage(page); if (d) pagesData.push({ img: d }); else pagesData.push({ lines: buildLines(tc) }); }
-    else pagesData.push({ lines: buildLines(tc) });
+    if (asImage) { const d = await renderPageImage(page); if (d) pagesData.push({ img: d, pg: i }); else pagesData.push({ lines: buildLines(tc), pg: i }); }
+    else pagesData.push({ lines: buildLines(tc), pg: i });
     if (i % 6 === 0) await tick();
   }
   // detecta cabeçalhos/rodapés repetidos
@@ -358,12 +368,12 @@ async function extractBook() {
   }
   const thr = Math.max(4, Math.round((textPages || 1) * 0.3));
   const boiler = new Set(Object.keys(freq).filter(k => freq[k] >= thr));
-  // monta blocos
+  // monta blocos (cada bloco guarda a página de origem)
   const content = [];
   for (const p of pagesData) {
-    if (p.img) { content.push({ t: "img", d: p.img }); continue; }
+    if (p.img) { content.push({ t: "img", d: p.img, pg: p.pg }); continue; }
     const blocks = linesToBlocks(p.lines, boiler);
-    for (const b of blocks) content.push(b);
+    for (const b of blocks) { b.pg = p.pg; content.push(b); }
   }
   mergeAcrossPages(content);
   current.content = content; current.extractedV = EXTRACT_V;
@@ -452,7 +462,7 @@ function mergeAcrossPages(content) {
   }
 }
 
-/* Pagina os blocos em telas que cabem em W x H (medição real, sem cortar) */
+/* Pagina os blocos em telas {h, pg} que cabem em W x H (medição real, sem cortar) */
 async function paginateAll(content, W, H, fpx) {
   const box = document.createElement("div");
   box.className = "kindle-text";
@@ -460,22 +470,24 @@ async function paginateAll(content, W, H, fpx) {
   box.setAttribute("lang", "pt-BR");
   document.body.appendChild(box);
   const out = [];
-  const push = () => { if (box.childNodes.length) { out.push(box.innerHTML); box.innerHTML = ""; } };
+  let curPg = null;
+  const push = () => { if (box.childNodes.length) { out.push({ h: box.innerHTML, pg: curPg || 1 }); box.innerHTML = ""; curPg = null; } };
   let i = 0;
   for (const b of content) {
-    if (b.t === "img") { push(); out.push('<div class="imgwrap"><img src="' + b.d + '"></div>'); }
+    if (curPg === null && b.pg) curPg = b.pg;
+    if (b.t === "img") { push(); out.push({ h: '<div class="imgwrap"><img src="' + b.d + '"></div>', pg: b.pg || 1 }); }
     else {
       const p = document.createElement("p"); if (b.t === "h") p.className = "head"; p.textContent = b.s; box.appendChild(p);
       if (box.scrollHeight > H + 1) {
-        if (box.childNodes.length === 1) { box.removeChild(p); await splitInto(b, box, out, H, push); }
-        else { box.removeChild(p); push(); box.appendChild(p); if (box.scrollHeight > H + 1) { box.removeChild(p); await splitInto(b, box, out, H, push); } }
+        if (box.childNodes.length === 1) { box.removeChild(p); curPg = b.pg; await splitInto(b, box, out, H, () => { out.push({ h: box.innerHTML, pg: curPg || b.pg || 1 }); box.innerHTML = ""; }); }
+        else { box.removeChild(p); push(); curPg = b.pg; box.appendChild(p); if (box.scrollHeight > H + 1) { box.removeChild(p); await splitInto(b, box, out, H, () => { out.push({ h: box.innerHTML, pg: curPg || b.pg || 1 }); box.innerHTML = ""; }); } }
       }
     }
     if ((++i % 60) === 0) { setLoading("Ajustando ao seu celular… " + Math.round(i / content.length * 100) + "%", Math.round(i / content.length * 100)); await tick(); }
   }
   push();
   document.body.removeChild(box);
-  return out.length ? out : [""];
+  return out.length ? out : [{ h: "", pg: 1 }];
 }
 
 async function splitInto(b, box, out, H, push) {
@@ -521,7 +533,7 @@ function renderImg() {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.imageSmoothingQuality = "high";
     ctx.drawImage(tmp, box.x, box.y, box.w, box.h, 0, 0, canvas.width, canvas.height);
     $("pageSheet").style.width = sheetW + "px"; $("pageSheet").style.padding = pad + "px";
-    $("pageInfo").textContent = imgPage + " / " + pdfDoc.numPages;
+    $("pageNum").textContent = imgPage;
     $("progressFill").style.width = (pdfDoc.numPages ? (imgPage / pdfDoc.numPages * 100) : 0) + "%";
     $("scroll").scrollTop = 0; saveImg();
     rendering = false; if (pendingRender) { pendingRender = false; renderImg(); }
@@ -544,6 +556,11 @@ function showBars(v) { barsHidden = !v; $("topbar").classList.toggle("hidden", b
 function toggleBars() { showBars(barsHidden); }
 function tapHandler(e) {
   if ($("settings").classList.contains("on")) { $("settings").classList.remove("on"); return; }
+  // tocar num grifo existente -> oferecer remover (não vira página)
+  if (e.target && e.target.tagName === "MARK") { e.stopPropagation(); removeHighlightAt(e.target); return; }
+  // se há texto selecionado, não vira página (deixa o usuário grifar)
+  const sel = window.getSelection();
+  if (sel && sel.toString().trim().length > 0) return;
   const w = window.innerWidth, x = e.clientX;
   if (x < w * 0.30) go(-1); else if (x > w * 0.70) go(1); else toggleBars();
 }
@@ -553,10 +570,79 @@ $("prev").onclick = (e) => { e.stopPropagation(); go(-1); };
 $("next").onclick = (e) => { e.stopPropagation(); go(1); };
 $("backBtn").onclick = async () => {
   if (current) { if (mode === "text") saveText(); else saveImg(); }
-  $("reader").style.display = "none"; $("library").style.display = "flex"; pdfDoc = null; current = null; screens = [""]; pageSig = ""; renderShelf();
+  $("reader").style.display = "none"; $("library").style.display = "flex"; pdfDoc = null; current = null; screens = [{ h: "", pg: 1 }]; pageSig = ""; renderShelf();
 };
 
-/* ===== Painel Aa ===== */
+/* ===== Grifos (highlight) ===== */
+let selText = "";
+function bookHL() { if (!current.highlights) current.highlights = []; return current.highlights; }
+
+document.addEventListener("selectionchange", () => {
+  if (mode !== "text" || !current) { hideGrifar(); return; }
+  const sel = window.getSelection();
+  const t = sel ? sel.toString().trim() : "";
+  if (t.length > 0 && sel.rangeCount) {
+    selText = t;
+    try {
+      const r = sel.getRangeAt(0).getBoundingClientRect();
+      if (r && r.width) {
+        const g = $("grifar");
+        g.style.left = Math.min(window.innerWidth - 60, Math.max(60, r.left + r.width / 2)) + "px";
+        g.style.top = (r.bottom + 10) + "px";
+        g.classList.add("on");
+      }
+    } catch (e) {}
+  } else { selText = ""; hideGrifar(); }
+});
+function hideGrifar() { $("grifar").classList.remove("on"); }
+
+$("grifar").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const sel = window.getSelection();
+  const txt = (sel && sel.toString().trim()) || selText;
+  if (!txt) { hideGrifar(); return; }
+  const hs = bookHL();
+  if (!hs.some(h => h.text === txt)) hs.push({ text: txt, ts: Date.now() });
+  if (sel) sel.removeAllRanges();
+  hideGrifar();
+  showScreen();            // re-renderiza e reaplica os grifos
+  saveText();
+});
+
+/* envolve as ocorrências dos grifos salvos no container renderizado */
+function applyHighlights(root) {
+  const hs = (current && current.highlights) ? current.highlights : [];
+  if (!hs.length) return;
+  for (const h of hs) wrapText(root, h.text);
+}
+function wrapText(root, text) {
+  if (!text) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    if (node.parentNode && node.parentNode.tagName === "MARK") continue;
+    const idx = node.nodeValue.indexOf(text);
+    if (idx >= 0) {
+      try {
+        const range = document.createRange();
+        range.setStart(node, idx); range.setEnd(node, idx + text.length);
+        const mark = document.createElement("mark"); mark.className = "hl";
+        range.surroundContents(mark);
+      } catch (e) {}
+      return;
+    }
+  }
+}
+function removeHighlightAt(markEl) {
+  const txt = markEl.textContent;
+  if (!confirm('Remover este grifo?')) return;
+  const hs = bookHL();
+  const i = hs.findIndex(h => h.text === txt);
+  if (i >= 0) hs.splice(i, 1);
+  showScreen(); saveText();
+}
+
+
 $("aaBtn").onclick = () => $("settings").classList.add("on");
 $("settings").onclick = e => { if (e.target.id === "settings") $("settings").classList.remove("on"); };
 document.querySelectorAll(".swatch").forEach(s => { s.onclick = () => applyTheme(s.dataset.theme); });
